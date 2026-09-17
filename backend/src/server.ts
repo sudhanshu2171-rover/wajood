@@ -4,7 +4,7 @@ import cors from 'cors';
 import { z } from 'zod';
 import { DAILY_LOSS_LIMIT, shadowOrderBlocked } from './guards.js';
 import { resolveMarketBias } from './marketBias.js';
-import { validateGiftNiftySnapshot } from './giftNifty.js';
+import { validateGiftNiftySnapshot, fetchGiftNifty } from './giftNifty.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
@@ -19,10 +19,15 @@ app.post('/api/kite/order', (req,res) => { const parsed=modeSchema.safeParse(req
 app.get('/api/wajood/config', (_req,res) => res.json({ version:'2.0-independent', sourceOfTruth:'github', dailyLossLimit:DAILY_LOSS_LIMIT, decisionPipeline:['OBSERVE','DATA QUALITY','MARKET CONTEXT','REGIME','TECHNICAL','OPTION CHAIN/OI','PANIC GUARD','EXPIRY HUNTER','CHALLENGE','DECISION','RISK GATE','EXECUTION GATE'], execution:'fail-closed', marketBiasRule:'After Indian market opens, live Indian indices have priority; GIFT Nifty is context only; stale/invalid GIFT data is ignored.' }));
 
 app.post('/api/wajood/market-bias', (req,res) => {
-  const schema=z.object({ phase:z.enum(['PRE_OPEN','OPEN_CONFIRMATION','LIVE']), giftNiftyPct:z.number().nullable(), giftStatus:z.enum(['LIVE','STALE','UNAVAILABLE']).optional(), liveIndexChanges:z.array(z.number()), liveBreadthPct:z.number().nullable().optional() });
+  const schema=z.object({ phase:z.enum(['PRE_OPEN','OPEN_CONFIRMATION','LIVE']), giftNiftyPct:z.number().nullable(), giftStatus:z.enum(['LIVE','STALE','UNAVAILABLE','INVALID']).optional(), liveIndexChanges:z.array(z.number()), liveBreadthPct:z.number().nullable().optional() });
   const parsed=schema.safeParse(req.body);
   if(!parsed.success) return res.status(400).json({error:'Invalid market-bias payload'});
   return res.json(resolveMarketBias(parsed.data));
+});
+
+app.get('/api/wajood/gift-nifty/live', async (_req,res) => {
+  const snapshot = await fetchGiftNifty();
+  return res.status(snapshot.status === 'LIVE' ? 200 : 503).json(snapshot);
 });
 
 app.post('/api/wajood/gift-nifty/validate', (req,res) => {
