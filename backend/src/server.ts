@@ -9,7 +9,8 @@ import { createKiteMarketStreamFromEnv } from './kiteStream.js';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN?.split(',').map(v => v.trim()) || true, credentials: true }));
+const corsOrigins = process.env.FRONTEND_ORIGIN?.split(',').map(v => v.trim()).filter(Boolean);
+app.use(cors({ origin: corsOrigins?.length ? corsOrigins : true, credentials: true }));
 app.use(express.json({ limit: '256kb' }));
 const modeSchema = z.enum(['PAPER','SHADOW','MANUAL','AUTO']);
 
@@ -17,14 +18,14 @@ const kiteStream = createKiteMarketStreamFromEnv();
 const DEFAULT_TOKENS = [256265, 260105, 257801, 265];
 if (kiteStream) kiteStream.subscribe((process.env.KITE_INDEX_TOKENS || DEFAULT_TOKENS.join(',')).split(',').map(Number).filter(Number.isInteger));
 
-app.get('/api/_healthcheck', (_req,res) => res.json({ ok:true, service:'wajood-backend', time:new Date().toISOString(), kite:kiteStream?.status() ?? {configured:false, connected:false} }));
+app.get('/api/_healthcheck', (_req,res) => res.json({ ok:true, service:'wajood-backend', time:new Date().toISOString(), kite:kiteStream?.status() ?? {configured:false, connected:false, reason:'KITE_API_KEY or KITE_ACCESS_TOKEN is not configured.'} }));
 app.get('/api/kite/live-status', (_req,res) => res.json(kiteStream?.status() ?? { configured:false, connected:false, reason:'KITE_API_KEY or KITE_ACCESS_TOKEN is not configured.' }));
 app.get('/api/kite/ticks', (req,res) => {
   res.setHeader('Content-Type','text/event-stream'); res.setHeader('Cache-Control','no-cache, no-transform'); res.setHeader('Connection','keep-alive'); res.flushHeaders?.();
-  if (!kiteStream) { res.write(`event: error\ndata: ${JSON.stringify({error:'KITE_NOT_CONFIGURED'})}\n\n`); res.end(); return; }
-  const unsubscribe = kiteStream.onTicks(ticks => res.write(`event: ticks\ndata: ${JSON.stringify({ticks, receivedAt:new Date().toISOString()})}\n\n`));
-  res.write(`event: status\ndata: ${JSON.stringify(kiteStream.status())}\n\n`);
-  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 15000);
+  if (!kiteStream) { res.write(`event: error\\ndata: ${JSON.stringify({error:'KITE_NOT_CONFIGURED'})}\\n\\n`); res.end(); return; }
+  const unsubscribe = kiteStream.onTicks(ticks => res.write(`event: ticks\\ndata: ${JSON.stringify({ticks, receivedAt:new Date().toISOString()})}\\n\\n`));
+  res.write(`event: status\\ndata: ${JSON.stringify(kiteStream.status())}\\n\\n`);
+  const heartbeat = setInterval(() => res.write(': heartbeat\\n\\n'), 15000);
   req.on('close', () => { clearInterval(heartbeat); unsubscribe(); });
 });
 
@@ -36,4 +37,4 @@ app.post('/api/wajood/market-bias', (req,res) => { const schema=z.object({ phase
 app.get('/api/wajood/gift-nifty/live', async (_req,res) => { const snapshot = await fetchGiftNifty(); return res.status(snapshot.status === 'LIVE' ? 200 : 503).json(snapshot); });
 app.post('/api/wajood/gift-nifty/validate', (req,res) => { const schema=z.object({ price:z.number().nullable(), previousClose:z.number().nullable(), asOf:z.string().nullable(), source:z.string().nullable().optional() }); const parsed=schema.safeParse(req.body); if(!parsed.success) return res.status(400).json({error:'Invalid GIFT Nifty snapshot'}); return res.json(validateGiftNiftySnapshot(parsed.data)); });
 
-app.listen(port, () => console.log(`WAJOOD independent backend listening on ${port}`));
+app.listen(port, '0.0.0.0', () => console.log(`WAJOOD independent backend listening on ${port}`));
