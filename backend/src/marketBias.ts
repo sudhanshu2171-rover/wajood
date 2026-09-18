@@ -1,7 +1,8 @@
 export type Bias = 'BULLISH' | 'BEARISH' | 'MIXED' | 'NEUTRAL';
 export type MarketPhase = 'PRE_OPEN' | 'OPEN_CONFIRMATION' | 'LIVE';
+export type GiftStatus = 'LIVE'|'STALE'|'UNAVAILABLE'|'INVALID';
 
-export function resolveMarketBias(input: { phase: MarketPhase; giftNiftyPct: number | null; giftStatus?: 'LIVE'|'STALE'|'UNAVAILABLE'; liveIndexChanges: number[]; liveBreadthPct?: number | null; }): { bias: Bias; strength: 'LOW'|'MEDIUM'|'HIGH'; giftRole: 'PRIMARY_CONTEXT'|'CONFIRMATION_ONLY'|'CONTEXT_ONLY'|'UNAVAILABLE'; reasons: string[] } {
+export function resolveMarketBias(input: { phase: MarketPhase; giftNiftyPct: number | null; giftStatus?: GiftStatus; liveIndexChanges: number[]; liveBreadthPct?: number | null; }): { bias: Bias; strength: 'LOW'|'MEDIUM'|'HIGH'; giftRole: 'PRIMARY_CONTEXT'|'CONFIRMATION_ONLY'|'CONTEXT_ONLY'|'UNAVAILABLE'; reasons: string[] } {
   const live = input.liveIndexChanges.filter(Number.isFinite);
   const liveAvg = live.length ? live.reduce((a,b)=>a+b,0)/live.length : null;
   const up = live.filter(v=>v>0.05).length;
@@ -17,7 +18,7 @@ export function resolveMarketBias(input: { phase: MarketPhase; giftNiftyPct: num
   const bias: Bias = up >= Math.ceil(live.length*0.6) && liveAvg > 0.05 ? 'BULLISH' : down >= Math.ceil(live.length*0.6) && liveAvg < -0.05 ? 'BEARISH' : 'MIXED';
   const reasons:string[]=[];
   if (gift != null && ((gift < -0.15 && bias === 'BULLISH') || (gift > 0.15 && bias === 'BEARISH'))) reasons.push('GIFT_LIVE_DIVERGENCE');
-  if (input.giftStatus === 'STALE') reasons.push('GIFT_NIFTY_STALE_CONTEXT_IGNORED');
+  if (input.giftStatus === 'STALE' || input.giftStatus === 'INVALID') reasons.push('GIFT_NIFTY_INVALID_OR_STALE_CONTEXT_IGNORED');
   if (input.giftStatus === 'UNAVAILABLE') reasons.push('GIFT_NIFTY_UNAVAILABLE_CONTEXT_IGNORED');
   if (input.liveBreadthPct != null && Number.isFinite(input.liveBreadthPct)) reasons.push(`LIVE_BREADTH_${input.liveBreadthPct >= 0 ? 'POSITIVE' : 'NEGATIVE'}`);
   if (!reasons.length) reasons.push('LIVE_INDIAN_MARKET_HAS_PRIORITY');
