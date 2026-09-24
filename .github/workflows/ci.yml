@@ -19,6 +19,10 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm test
+      - name: Report production dependency vulnerabilities
+        run: npm audit --omit=dev --audit-level=moderate --json > dependency-audit.json || true
+      - name: Show crypto-js dependency chain
+        run: npm ls crypto-js --all || true
 
   frontend:
     runs-on: ubuntu-latest
