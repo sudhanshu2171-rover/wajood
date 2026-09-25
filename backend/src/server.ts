@@ -51,7 +51,13 @@ if (kiteStream) {
     .filter(Number.isInteger);
   kiteStream.subscribe(tokens);
   // Start the read-only Kite market-data stream at process startup.
-  kiteStream.connect();
+  // Order execution remains fail-closed and is never enabled by this connection.
+  try {
+    kiteStream.connect();
+    console.log(`WAJOOD Kite market-data stream startup requested for ${tokens.length} token(s)`);
+  } catch (error: any) {
+    console.error(`WAJOOD Kite stream startup failed: ${error?.message || 'KITE_STREAM_STARTUP_ERROR'}`);
+  }
 }
 
 app.get('/api/_healthcheck', (_req,res) => res.json({ ok:true, service:'wajood-backend', time:new Date().toISOString(), kite:kiteStream?.status() ?? {configured:false, connected:false, reason:'KITE_API_KEY or KITE_ACCESS_TOKEN is not configured.'} }));
