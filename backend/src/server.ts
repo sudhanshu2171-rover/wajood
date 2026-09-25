@@ -44,7 +44,14 @@ async function fetchKiteHistorical(token:number, interval='5minute', days=5):Pro
 
 const kiteStream = createKiteMarketStreamFromEnv();
 const DEFAULT_TOKENS = [256265, 260105, 257801, 265];
-if (kiteStream) kiteStream.subscribe((process.env.KITE_INDEX_TOKENS || DEFAULT_TOKENS.join(',')).split(',').map(Number).filter(Number.isInteger));
+if (kiteStream) {
+  const tokens = (process.env.KITE_INDEX_TOKENS || DEFAULT_TOKENS.join(','))
+    .split(',')
+    .map(v => Number(v.trim()))
+    .filter(Number.isInteger);
+  kiteStream.subscribe(tokens);
+  kiteStream.connect();
+}
 
 app.get('/api/_healthcheck', (_req,res) => res.json({ ok:true, service:'wajood-backend', time:new Date().toISOString(), kite:kiteStream?.status() ?? {configured:false, connected:false, reason:'KITE_API_KEY or KITE_ACCESS_TOKEN is not configured.'} }));
 app.get('/api/kite/live-status', (_req,res) => res.json(kiteStream?.status() ?? { configured:false, connected:false, reason:'KITE_API_KEY or KITE_ACCESS_TOKEN is not configured.' }));
