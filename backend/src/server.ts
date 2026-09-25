@@ -50,6 +50,7 @@ if (kiteStream) {
     .map(v => Number(v.trim()))
     .filter(Number.isInteger);
   kiteStream.subscribe(tokens);
+  // Start the read-only Kite market-data stream at process startup.
   kiteStream.connect();
 }
 
